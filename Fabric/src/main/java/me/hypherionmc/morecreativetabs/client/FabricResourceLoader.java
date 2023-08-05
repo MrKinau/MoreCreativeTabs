@@ -1,6 +1,7 @@
 package me.hypherionmc.morecreativetabs.client;
 
 import me.hypherionmc.morecreativetabs.ModConstants;
+import me.hypherionmc.morecreativetabs.client.data.MoreCreativeTabsData;
 import me.hypherionmc.morecreativetabs.client.tabs.CustomCreativeTabRegistry;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.Minecraft;
@@ -51,14 +52,15 @@ public class FabricResourceLoader implements SimpleSynchronousResourceReloadList
         Map<ResourceLocation, Resource> disabledTabs = manager.listResources("morecreativetabs", path -> path.getPath().contains("disabled_tabs.json"));
         Map<ResourceLocation, Resource> orderedTabs = manager.listResources("morecreativetabs", path -> path.getPath().contains("ordered_tabs.json"));
 
-        if (!disabledTabs.isEmpty()) {
-            CustomCreativeTabRegistry.loadDisabledTabs(disabledTabs);
-        }
-
-        if (!orderedTabs.isEmpty()) {
-            CustomCreativeTabRegistry.loadOrderedTabs(orderedTabs);
-        }
+        CustomCreativeTabRegistry.loadDisabledTabs(disabledTabs);
+        CustomCreativeTabRegistry.loadOrderedTabs(orderedTabs);
 
         CustomCreativeTabRegistry.processEntries(customTabs);
+    }
+
+    public static void loadServerData(MoreCreativeTabsData data) {
+        ModConstants.logger.info("Received custom creative tabs");
+        CustomCreativeTabRegistry.server_data = data;
+        reloadTabs();
     }
 }

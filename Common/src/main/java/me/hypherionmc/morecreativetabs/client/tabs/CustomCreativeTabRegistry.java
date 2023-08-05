@@ -5,6 +5,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import me.hypherionmc.morecreativetabs.ModConstants;
 import me.hypherionmc.morecreativetabs.client.data.CustomCreativeTab;
 import me.hypherionmc.morecreativetabs.client.data.DisabledTabsJsonHelper;
+import me.hypherionmc.morecreativetabs.client.data.MoreCreativeTabsData;
 import me.hypherionmc.morecreativetabs.client.data.OrderedTabs;
 import me.hypherionmc.morecreativetabs.mixin.accessors.CreativeModeTabAccessor;
 import me.hypherionmc.morecreativetabs.mixin.accessors.CreativeModeTabsAccessor;
@@ -60,6 +61,9 @@ public class CustomCreativeTabRegistry {
 
     public static List<CreativeModeTab> current_tabs = new LinkedList<>();
 
+    /* Holds the custom tab data received from a remote server */
+    public static MoreCreativeTabsData server_data;
+
     /**
      * Load and process the resource/data pack
      * @param entries - The found entries
@@ -70,68 +74,77 @@ public class CustomCreativeTabRegistry {
 
             try (InputStream stream = resource.open()) {
                 CustomCreativeTab json = GSON.fromJson(new InputStreamReader(stream), CustomCreativeTab.class);
-                ArrayList<ItemStack> tabItems = new ArrayList<>();
-
-                /* Check if the tab is enabled and should be loaded */
-                if (json.tab_enabled) {
-
-                    /* Loop over all the Item Stack entries */
-                    json.tab_items.forEach(item -> {
-                        if (item.name.equalsIgnoreCase("existing"))
-                            json.keepExisting = true;
-
-                        ItemStack stack = getItemStack(item.name);
-                        if (stack != ItemStack.EMPTY) {
-                            if (item.hide_old_tab) {
-                                hidden_stacks.add(stack.getItem());
-                            }
-
-                            /* Parse the Item NBT and apply it to the stack */
-                            if (item.nbt != null && !item.nbt.isEmpty()) {
-                                try {
-                                    CompoundTag tag = TagParser.parseTag(item.nbt);
-                                    stack.setTag(tag);
-
-                                    /* Give the item a "Custom Name" if defined in NBT */
-                                    if (tag.contains("customName")) {
-                                        stack.setHoverName(Component.literal(tag.getString("customName")));
-                                    }
-                                } catch (CommandSyntaxException e) {
-                                    ModConstants.logger.error("Failed to Process NBT for Item {}", item.name, e);
-                                }
-                            }
-
-                            /* Store the item for adding to the creative tab */
-                            tabItems.add(stack);
-                        }
-                    });
-
-                    /* Check if tab replaces an existing tab */
-                    if (json.replace) {
-                        replaced_tabs.put(fileToTab(location.getPath()).toLowerCase(), Pair.of(json, tabItems));
-                    } else {
-                        /* Create the actual tab and store it */
-                        CreativeModeTab.Builder builder = new CreativeModeTab.Builder(null, -1);
-                        builder.title(Component.translatable(prefix(json.tab_name)));
-                        builder.icon(() -> makeTabIcon(json));
-
-                        if (json.tab_background != null) {
-                            builder.backgroundSuffix(json.tab_background);
-                        }
-
-                        CreativeModeTab tab = builder.build();
-                        custom_tabs.add(tab);
-                        tab_items.put(tab, tabItems);
-                    }
-
-                }
-
+                processEntry(json, fileToTab(location.getPath()));
             } catch (Exception e) {
                 ModConstants.logger.error("Failed to process creative tab", e);
             }
         });
+        if (server_data != null)
+            server_data.tabs.forEach((tabName, tab) -> processEntry(tab, tabName));
 
         reorderTabs();
+    }
+
+    private static void processEntry(CustomCreativeTab json, String tabName) {
+        try {
+            ArrayList<ItemStack> tabItems = new ArrayList<>();
+
+            /* Check if the tab is enabled and should be loaded */
+            if (json.tab_enabled) {
+
+                /* Loop over all the Item Stack entries */
+                json.tab_items.forEach(item -> {
+                    if (item.name.equalsIgnoreCase("existing"))
+                        json.keepExisting = true;
+
+                    ItemStack stack = getItemStack(item.name);
+                    if (stack != ItemStack.EMPTY) {
+                        if (item.hide_old_tab) {
+                            hidden_stacks.add(stack.getItem());
+                        }
+
+                        /* Parse the Item NBT and apply it to the stack */
+                        if (item.nbt != null && !item.nbt.isEmpty()) {
+                            try {
+                                CompoundTag tag = TagParser.parseTag(item.nbt);
+                                stack.setTag(tag);
+
+                                /* Give the item a "Custom Name" if defined in NBT */
+                                if (tag.contains("customName")) {
+                                    stack.setHoverName(Component.literal(tag.getString("customName")));
+                                }
+                            } catch (CommandSyntaxException e) {
+                                ModConstants.logger.error("Failed to Process NBT for Item {}", item.name, e);
+                            }
+                        }
+
+                        /* Store the item for adding to the creative tab */
+                        tabItems.add(stack);
+                    }
+                });
+
+                /* Check if tab replaces an existing tab */
+                if (json.replace) {
+                    replaced_tabs.put(tabName.toLowerCase(), Pair.of(json, tabItems));
+                } else {
+                    /* Create the actual tab and store it */
+                    CreativeModeTab.Builder builder = new CreativeModeTab.Builder(null, -1);
+                    builder.title(Component.translatable(prefix(json.tab_name)));
+                    builder.icon(() -> makeTabIcon(json));
+
+                    if (json.tab_background != null) {
+                        builder.backgroundSuffix(json.tab_background);
+                    }
+
+                    CreativeModeTab tab = builder.build();
+                    custom_tabs.add(tab);
+                    tab_items.put(tab, tabItems);
+                }
+
+            }
+        } catch (Exception e) {
+            ModConstants.logger.error("Failed to process creative tab", e);
+        }
     }
 
     /**
@@ -147,6 +160,8 @@ public class CustomCreativeTabRegistry {
                 ModConstants.logger.error("Failed to process disabled tabs for " + location, e);
             }
         });
+        if (server_data != null && server_data.disabled_tabs != null)
+            disabled_tabs.addAll(server_data.disabled_tabs);
     }
 
     /**
@@ -162,6 +177,8 @@ public class CustomCreativeTabRegistry {
                 ModConstants.logger.error("Failed to process ordered tabs for " + location, e);
             }
         });
+        if (server_data != null && server_data.ordered_tabs != null)
+            reordered_tabs.addAll(server_data.ordered_tabs);
     }
 
     /**
@@ -188,7 +205,6 @@ public class CustomCreativeTabRegistry {
         } else {
             addExisting = true;
         }
-
 
         if (addExisting) {
             for (CreativeModeTab tab : oldTabs) {

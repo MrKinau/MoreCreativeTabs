@@ -52,13 +52,8 @@ public class MoreCreativeTabs {
             Map<ResourceLocation, Resource> disabledTabs = manager.listResources("morecreativetabs", path -> path.getPath().contains("disabled_tabs.json"));
             Map<ResourceLocation, Resource> orderedTabs = manager.listResources("morecreativetabs", path -> path.getPath().contains("ordered_tabs.json"));
 
-            if (!disabledTabs.isEmpty()) {
-                CustomCreativeTabRegistry.loadDisabledTabs(disabledTabs);
-            }
-
-            if (!orderedTabs.isEmpty()) {
-                CustomCreativeTabRegistry.loadOrderedTabs(orderedTabs);
-            }
+            CustomCreativeTabRegistry.loadDisabledTabs(disabledTabs);
+            CustomCreativeTabRegistry.loadOrderedTabs(orderedTabs);
 
             CustomCreativeTabRegistry.processEntries(customTabs);
         });

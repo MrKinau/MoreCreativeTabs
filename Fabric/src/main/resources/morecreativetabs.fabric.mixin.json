@@ -8,7 +8,8 @@
   "client": [
     "FabricCreativeGuiComponentsMixin",
     "FabricCreativeModeTabMixin",
-    "FabricCreativeModeTabsMixin"
+    "FabricCreativeModeTabsMixin",
+    "FabricClientPacketListenerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
